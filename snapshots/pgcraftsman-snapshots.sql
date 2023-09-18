@@ -84,6 +84,14 @@ create table snapshots.snap_stat_activity as
      from pg_stat_activity;
 create index idx_snap_stat_activity_snap_id
       on snapshots.snap_stat_activity(snap_id);
+
+-- pg_stat_statements
+create table snapshots.snap_stat_statements as
+   select 1 snap_id, now() dttm, *
+     from pg_stat_statements;
+create index idx_snap_stat_statements_snap_id
+      on snapshots.snap_stat_statements(snap_id);
+
 --pg_locks
 create table snapshots.snap_pg_locks as
   select 1 snap_id, now() dttm, *
@@ -107,13 +115,12 @@ create table snapshots.snap_databases as
    select 1 snap_id, now() dttm, *,
         pg_database_size(datname::text) dbsize
      from pg_stat_database where datname not in ('rdsadmin');
-
 create index idx_snap_databases_snap_id on snapshots.snap_databases(snap_id);
 
+-- snap_settings
 create table snapshots.snap_settings as
     select 1 snap_id, now() dttm, name, setting
      from pg_settings;
-
 create index idx_snap_settings_snap_id on snapshots.snap_settings(snap_id);
 create index idx_snap_settings_snap_name on snapshots.snap_settings(name);
 create index idx_snap_settings_snap_name_setting on snapshots.snap_settings(name,setting);
@@ -121,7 +128,6 @@ create index idx_snap_settings_snap_name_setting on snapshots.snap_settings(name
 --Snapshot parent table
 create table snapshots.snap as
     SELECT 1 snap_id, now() dttm;
-
 create index idx_snap_snap_id on snapshots.snap(snap_id);
 create index idx_snap_snap_dttm on snapshots.snap(dttm);
 
@@ -188,7 +194,11 @@ alter table snapshots.snap_user_tables
   references snapshots.snap ( snap_id ) on delete cascade;
 
 alter table snapshots.snap_stat_activity
-  add constraint sst_snap_id foreign key (snap_id )
+  add constraint ssa_snap_id foreign key (snap_id )
+  references snapshots.snap ( snap_id ) on delete cascade;
+
+alter table snapshots.snap_stat_statements
+  add constraint sss_snap_id foreign key (snap_id )
   references snapshots.snap ( snap_id ) on delete cascade;
 
 alter table snapshots.snap_indexes
@@ -239,6 +249,8 @@ BEGIN
            from pg_statio_all_tables where schemaname not in ('rdsadmin');
 
     insert into snapshots.snap_stat_activity SELECT i_snap_id, now(), * from pg_stat_activity;
+
+    insert into snapshots.snap_stat_statements SELECT i_snap_id, now(), * from pg_stat_statements;
 
     insert into snapshots.snap_indexes SELECT i_snap_id, now(), * ,
                 pg_relation_size(relid::regclass) relsize,
